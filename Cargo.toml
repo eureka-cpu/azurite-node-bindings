@@ -1,6 +1,6 @@
 [package]
 name = "azurite-node-bindings"
-version = "0.1.0"
+version = "3.35.0"
 edition = "2024"
 description = "Rust bindings for the Azurite blob, table and queue storage emulator"
 license = "MIT"
