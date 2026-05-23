@@ -32,8 +32,24 @@
           checkPhase = ''
             cargo fmt --check
             cargo clippy -- -Dwarnings
-            cargo doc
           '';
+        };
+
+        docs = pkgs.rustPlatform.buildRustPackage {
+          pname = "azure-node-bindings-docs";
+          version = "0.1.0";
+          src = lib.cleanSourceWith {
+            filter = path: _type: !lib.hasSuffix ".nix" path;
+            src = lib.cleanSource ./.;
+          };
+          cargoLock.lockFile = ./Cargo.lock;
+          buildPhase = "cargo doc --no-deps";
+          installPhase = ''
+            mv target/doc $out
+            echo '<meta http-equiv="refresh" content="0; url=azurite_node_bindings/index.html">' \
+              > $out/index.html
+          '';
+          doCheck = false;
         };
       } // lib.optionalAttrs pkgs.stdenv.isLinux {
         nixos-azurite = import ./nixos/modules/azurite/test.nix { inherit pkgs self lib; };
@@ -68,6 +84,7 @@
               nixpkgs-fmt.enable = true;
               rustfmt.enable = true;
               taplo.enable = true;
+              yamlfmt.enable = true;
               mdformat.enable = true;
             };
           };

@@ -2,6 +2,11 @@
 name = "azurite-node-bindings"
 version = "0.1.0"
 edition = "2024"
+description = "Rust bindings for the Azurite blob, table and queue storage emulator"
+license = "MIT"
+repository = "https://github.com/eureka-cpu/azurite-node-bindings"
+readme = "README.md"
+include = ["src/**/*", "README.md", "LICENSE"]
 
 [dev-dependencies]
 tracing = "0.1"
