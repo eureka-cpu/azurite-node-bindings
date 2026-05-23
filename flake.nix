@@ -17,15 +17,28 @@
     let
       inherit (nixpkgs) lib;
       eachSystem = f: lib.genAttrs lib.systems.flakeExposed (system: f nixpkgs.legacyPackages.${system});
+
+      src = lib.cleanSourceWith {
+        filter = path: _type: !lib.hasSuffix ".nix" path;
+        src = lib.cleanSource ./.;
+      };
+
+      formattingOptions = {
+        projectRootFile = "flake.lock";
+        programs = {
+          nixpkgs-fmt.enable = true;
+          rustfmt.enable = true;
+          taplo.enable = true;
+          yamlfmt.enable = true;
+          mdformat.enable = true;
+        };
+      };
     in
     {
       checks = eachSystem (pkgs: {
         azure-node-bindings = pkgs.rustPlatform.buildRustPackage {
+          inherit src;
           name = "azure-node-bindings";
-          src = lib.cleanSourceWith {
-            filter = path: _type: !lib.hasSuffix ".nix" path;
-            src = lib.cleanSource ./.;
-          };
           cargoLock.lockFile = ./Cargo.lock;
           doCheck = true;
           nativeCheckInputs = with pkgs; [ cargo rustc clippy rustfmt ];
@@ -36,12 +49,8 @@
         };
 
         docs = pkgs.rustPlatform.buildRustPackage {
-          pname = "azure-node-bindings-docs";
-          version = "0.1.0";
-          src = lib.cleanSourceWith {
-            filter = path: _type: !lib.hasSuffix ".nix" path;
-            src = lib.cleanSource ./.;
-          };
+          inherit src;
+          name = "azure-node-bindings-docs";
           cargoLock.lockFile = ./Cargo.lock;
           buildPhase = "cargo doc --no-deps";
           installPhase = ''
@@ -51,18 +60,30 @@
           '';
           doCheck = false;
         };
+
+        fmt =
+          let
+            treefmt =
+              let
+                treefmt = import inputs.treefmt;
+              in
+              treefmt.evalModule pkgs formattingOptions;
+          in
+          treefmt.config.build.check ./.;
       } // lib.optionalAttrs pkgs.stdenv.isLinux {
         nixos-azurite = import ./nixos/modules/azurite/test.nix { inherit pkgs self lib; };
         nixos-azurite-blob = import ./nixos/modules/azurite-blob/test.nix { inherit pkgs self lib; };
         nixos-azurite-queue = import ./nixos/modules/azurite-queue/test.nix { inherit pkgs self lib; };
         nixos-azurite-table = import ./nixos/modules/azurite-table/test.nix { inherit pkgs self lib; };
       });
+
       nixosModules = {
         azurite = import ./nixos/modules/azurite;
         azurite-blob = import ./nixos/modules/azurite-blob;
         azurite-table = import ./nixos/modules/azurite-table;
         azurite-queue = import ./nixos/modules/azurite-queue;
       };
+
       devShells = eachSystem (pkgs: {
         default = pkgs.mkShell {
           buildInputs = with pkgs; [
@@ -75,19 +96,10 @@
           ];
         };
       });
+
       formatter = eachSystem (pkgs:
         let
           treefmt = inputs.treefmt.lib;
-          formattingOptions = {
-            projectRootFile = "flake.lock";
-            programs = {
-              nixpkgs-fmt.enable = true;
-              rustfmt.enable = true;
-              taplo.enable = true;
-              yamlfmt.enable = true;
-              mdformat.enable = true;
-            };
-          };
         in
         treefmt.mkWrapper pkgs formattingOptions);
     };
