@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "azurite-node-bindings"
-version = "0.1.0"
+version = "3.35.0"
 dependencies = [
  "tracing",
  "tracing-subscriber",
