@@ -35,6 +35,11 @@
             cargo doc
           '';
         };
+      } // lib.optionalAttrs pkgs.stdenv.isLinux {
+        nixos-azurite = import ./nixos/modules/azurite/test.nix { inherit pkgs self lib; };
+        nixos-azurite-blob = import ./nixos/modules/azurite-blob/test.nix { inherit pkgs self lib; };
+        nixos-azurite-queue = import ./nixos/modules/azurite-queue/test.nix { inherit pkgs self lib; };
+        nixos-azurite-table = import ./nixos/modules/azurite-table/test.nix { inherit pkgs self lib; };
       });
       nixosModules = {
         azurite = import ./nixos/modules/azurite;
