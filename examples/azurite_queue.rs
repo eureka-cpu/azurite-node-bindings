@@ -33,7 +33,7 @@ fn main() {
         .start()
         .expect("failed to spawn azurite-queue");
 
-    let pid = azurite.pid().expect("pid must be set after start");
+    let pid = azurite.pid();
     info!(pid, "azurite-queue process spawned");
 
     info!(port = 10001, "waiting for queue port");
@@ -66,7 +66,7 @@ fn main() {
         .start()
         .expect("failed to spawn azurite-queue (in-memory)");
 
-    let pid2 = azurite2.pid().expect("pid must be set after start");
+    let pid2 = azurite2.pid();
     info!(pid = pid2, "azurite-queue (in-memory) spawned");
 
     assert!(

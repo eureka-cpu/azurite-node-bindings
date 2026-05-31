@@ -4,9 +4,17 @@
 //! can be ran individually using [`AzuriteBlob`], [`AzuriteTable`] and [`AzuriteQueue`].
 
 use std::io;
+use std::marker::PhantomData;
 use std::process::{Child, Command};
 
+/// Marker type for the builder state — builder methods are available, the process has not started.
+pub struct Builder;
+
 /// Runs all three Azurite services (blob, table, queue) in a single process.
+///
+/// The type parameter `State` tracks whether the process has been started:
+/// - [`Azurite<Builder>`] — builder methods available, process not yet running.
+/// - [`Azurite<()>`] — process is running, `pid()` and similar methods available.
 ///
 /// # Example
 ///
@@ -21,7 +29,7 @@ use std::process::{Child, Command};
 ///     .unwrap();
 /// // process is killed when `azurite` is dropped
 /// ```
-pub struct Azurite {
+pub struct Azurite<State = Builder> {
     blob_host: Option<String>,
     blob_keep_alive_timeout: Option<u64>,
     blob_port: Option<u16>,
@@ -46,9 +54,10 @@ pub struct Azurite {
     skip_api_version_check: bool,
     pid: Option<u32>,
     child: Option<Child>,
+    _state: PhantomData<State>,
 }
 
-impl Azurite {
+impl Azurite<Builder> {
     pub fn new() -> Self {
         Self {
             blob_host: None,
@@ -75,6 +84,7 @@ impl Azurite {
             skip_api_version_check: false,
             pid: None,
             child: None,
+            _state: PhantomData,
         }
     }
 
@@ -167,13 +177,8 @@ impl Azurite {
         self
     }
 
-    /// Returns the PID of the spawned process, or `None` if not yet started.
-    pub fn pid(&self) -> Option<u32> {
-        self.pid
-    }
-
     /// Spawn the `azurite` process with the configured options.
-    pub fn start(mut self) -> io::Result<Self> {
+    pub fn start(mut self) -> io::Result<Azurite<()>> {
         let mut cmd = Command::new("azurite");
         if let Some(ref v) = self.blob_host {
             cmd.args(["--blobHost", v]);
@@ -242,19 +247,50 @@ impl Azurite {
             cmd.arg("--skipApiVersionCheck");
         }
         let child = cmd.spawn()?;
-        self.pid = Some(child.id());
-        self.child = Some(child);
-        Ok(self)
+        Ok(Azurite {
+            blob_host: self.blob_host.take(),
+            blob_keep_alive_timeout: self.blob_keep_alive_timeout,
+            blob_port: self.blob_port,
+            queue_host: self.queue_host.take(),
+            queue_keep_alive_timeout: self.queue_keep_alive_timeout,
+            queue_port: self.queue_port,
+            table_host: self.table_host.take(),
+            table_keep_alive_timeout: self.table_keep_alive_timeout,
+            table_port: self.table_port,
+            cert: self.cert.take(),
+            debug: self.debug.take(),
+            disable_product_style_url: self.disable_product_style_url,
+            disable_telemetry: self.disable_telemetry,
+            extent_memory_limit: self.extent_memory_limit,
+            in_memory_persistence: self.in_memory_persistence,
+            key: self.key.take(),
+            location: self.location.take(),
+            loose: self.loose,
+            oauth: self.oauth.take(),
+            pwd: self.pwd.take(),
+            silent: self.silent,
+            skip_api_version_check: self.skip_api_version_check,
+            pid: Some(child.id()),
+            child: Some(child),
+            _state: PhantomData,
+        })
     }
 }
 
-impl Default for Azurite {
+impl Azurite<()> {
+    /// Returns the PID of the spawned process.
+    pub fn pid(&self) -> u32 {
+        self.pid.expect("pid is set after start")
+    }
+}
+
+impl Default for Azurite<Builder> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for Azurite {
+impl<State> Drop for Azurite<State> {
     fn drop(&mut self) {
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
@@ -264,6 +300,10 @@ impl Drop for Azurite {
 }
 
 /// Runs only the Azurite blob storage service.
+///
+/// The type parameter `State` tracks whether the process has been started:
+/// - [`AzuriteBlob<Builder>`] — builder methods available, process not yet running.
+/// - [`AzuriteBlob<()>`] — process is running, `pid()` and similar methods available.
 ///
 /// # Example
 ///
@@ -275,7 +315,7 @@ impl Drop for Azurite {
 ///     .start()
 ///     .unwrap();
 /// ```
-pub struct AzuriteBlob {
+pub struct AzuriteBlob<State = Builder> {
     blob_host: Option<String>,
     blob_keep_alive_timeout: Option<u64>,
     blob_port: Option<u16>,
@@ -294,9 +334,10 @@ pub struct AzuriteBlob {
     skip_api_version_check: bool,
     pid: Option<u32>,
     child: Option<Child>,
+    _state: PhantomData<State>,
 }
 
-impl AzuriteBlob {
+impl AzuriteBlob<Builder> {
     pub fn new() -> Self {
         Self {
             blob_host: None,
@@ -317,6 +358,7 @@ impl AzuriteBlob {
             skip_api_version_check: false,
             pid: None,
             child: None,
+            _state: PhantomData,
         }
     }
 
@@ -385,13 +427,8 @@ impl AzuriteBlob {
         self
     }
 
-    /// Returns the PID of the spawned process, or `None` if not yet started.
-    pub fn pid(&self) -> Option<u32> {
-        self.pid
-    }
-
     /// Spawn the `azurite-blob` process with the configured options.
-    pub fn start(mut self) -> io::Result<Self> {
+    pub fn start(mut self) -> io::Result<AzuriteBlob<()>> {
         let mut cmd = Command::new("azurite-blob");
         if let Some(ref v) = self.blob_host {
             cmd.args(["--blobHost", v]);
@@ -442,19 +479,44 @@ impl AzuriteBlob {
             cmd.arg("--skipApiVersionCheck");
         }
         let child = cmd.spawn()?;
-        self.pid = Some(child.id());
-        self.child = Some(child);
-        Ok(self)
+        Ok(AzuriteBlob {
+            blob_host: self.blob_host.take(),
+            blob_keep_alive_timeout: self.blob_keep_alive_timeout,
+            blob_port: self.blob_port,
+            cert: self.cert.take(),
+            debug: self.debug.take(),
+            disable_product_style_url: self.disable_product_style_url,
+            disable_telemetry: self.disable_telemetry,
+            extent_memory_limit: self.extent_memory_limit,
+            in_memory_persistence: self.in_memory_persistence,
+            key: self.key.take(),
+            location: self.location.take(),
+            loose: self.loose,
+            oauth: self.oauth.take(),
+            pwd: self.pwd.take(),
+            silent: self.silent,
+            skip_api_version_check: self.skip_api_version_check,
+            pid: Some(child.id()),
+            child: Some(child),
+            _state: PhantomData,
+        })
     }
 }
 
-impl Default for AzuriteBlob {
+impl AzuriteBlob<()> {
+    /// Returns the PID of the spawned process.
+    pub fn pid(&self) -> u32 {
+        self.pid.expect("pid is set after start")
+    }
+}
+
+impl Default for AzuriteBlob<Builder> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for AzuriteBlob {
+impl<State> Drop for AzuriteBlob<State> {
     fn drop(&mut self) {
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
@@ -464,6 +526,10 @@ impl Drop for AzuriteBlob {
 }
 
 /// Runs only the Azurite table storage service.
+///
+/// The type parameter `State` tracks whether the process has been started:
+/// - [`AzuriteTable<Builder>`] — builder methods available, process not yet running.
+/// - [`AzuriteTable<()>`] — process is running, `pid()` and similar methods available.
 ///
 /// # Example
 ///
@@ -475,7 +541,7 @@ impl Drop for AzuriteBlob {
 ///     .start()
 ///     .unwrap();
 /// ```
-pub struct AzuriteTable {
+pub struct AzuriteTable<State = Builder> {
     table_host: Option<String>,
     table_keep_alive_timeout: Option<u64>,
     table_port: Option<u16>,
@@ -493,9 +559,10 @@ pub struct AzuriteTable {
     skip_api_version_check: bool,
     pid: Option<u32>,
     child: Option<Child>,
+    _state: PhantomData<State>,
 }
 
-impl AzuriteTable {
+impl AzuriteTable<Builder> {
     pub fn new() -> Self {
         Self {
             table_host: None,
@@ -515,6 +582,7 @@ impl AzuriteTable {
             skip_api_version_check: false,
             pid: None,
             child: None,
+            _state: PhantomData,
         }
     }
 
@@ -579,13 +647,8 @@ impl AzuriteTable {
         self
     }
 
-    /// Returns the PID of the spawned process, or `None` if not yet started.
-    pub fn pid(&self) -> Option<u32> {
-        self.pid
-    }
-
     /// Spawn the `azurite-table` process with the configured options.
-    pub fn start(mut self) -> io::Result<Self> {
+    pub fn start(mut self) -> io::Result<AzuriteTable<()>> {
         let mut cmd = Command::new("azurite-table");
         if let Some(ref v) = self.table_host {
             cmd.args(["--tableHost", v]);
@@ -633,19 +696,43 @@ impl AzuriteTable {
             cmd.arg("--skipApiVersionCheck");
         }
         let child = cmd.spawn()?;
-        self.pid = Some(child.id());
-        self.child = Some(child);
-        Ok(self)
+        Ok(AzuriteTable {
+            table_host: self.table_host.take(),
+            table_keep_alive_timeout: self.table_keep_alive_timeout,
+            table_port: self.table_port,
+            cert: self.cert.take(),
+            debug: self.debug.take(),
+            disable_product_style_url: self.disable_product_style_url,
+            disable_telemetry: self.disable_telemetry,
+            in_memory_persistence: self.in_memory_persistence,
+            key: self.key.take(),
+            location: self.location.take(),
+            loose: self.loose,
+            oauth: self.oauth.take(),
+            pwd: self.pwd.take(),
+            silent: self.silent,
+            skip_api_version_check: self.skip_api_version_check,
+            pid: Some(child.id()),
+            child: Some(child),
+            _state: PhantomData,
+        })
     }
 }
 
-impl Default for AzuriteTable {
+impl AzuriteTable<()> {
+    /// Returns the PID of the spawned process.
+    pub fn pid(&self) -> u32 {
+        self.pid.expect("pid is set after start")
+    }
+}
+
+impl Default for AzuriteTable<Builder> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for AzuriteTable {
+impl<State> Drop for AzuriteTable<State> {
     fn drop(&mut self) {
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
@@ -655,6 +742,10 @@ impl Drop for AzuriteTable {
 }
 
 /// Runs only the Azurite queue storage service.
+///
+/// The type parameter `State` tracks whether the process has been started:
+/// - [`AzuriteQueue<Builder>`] — builder methods available, process not yet running.
+/// - [`AzuriteQueue<()>`] — process is running, `pid()` and similar methods available.
 ///
 /// # Example
 ///
@@ -666,7 +757,7 @@ impl Drop for AzuriteTable {
 ///     .start()
 ///     .unwrap();
 /// ```
-pub struct AzuriteQueue {
+pub struct AzuriteQueue<State = Builder> {
     queue_host: Option<String>,
     queue_port: Option<u16>,
     cert: Option<String>,
@@ -684,9 +775,10 @@ pub struct AzuriteQueue {
     skip_api_version_check: bool,
     pid: Option<u32>,
     child: Option<Child>,
+    _state: PhantomData<State>,
 }
 
-impl AzuriteQueue {
+impl AzuriteQueue<Builder> {
     pub fn new() -> Self {
         Self {
             queue_host: None,
@@ -706,6 +798,7 @@ impl AzuriteQueue {
             skip_api_version_check: false,
             pid: None,
             child: None,
+            _state: PhantomData,
         }
     }
 
@@ -770,13 +863,8 @@ impl AzuriteQueue {
         self
     }
 
-    /// Returns the PID of the spawned process, or `None` if not yet started.
-    pub fn pid(&self) -> Option<u32> {
-        self.pid
-    }
-
     /// Spawn the `azurite-queue` process with the configured options.
-    pub fn start(mut self) -> io::Result<Self> {
+    pub fn start(mut self) -> io::Result<AzuriteQueue<()>> {
         let mut cmd = Command::new("azurite-queue");
         if let Some(ref v) = self.queue_host {
             cmd.args(["--queueHost", v]);
@@ -824,19 +912,43 @@ impl AzuriteQueue {
             cmd.arg("--skipApiVersionCheck");
         }
         let child = cmd.spawn()?;
-        self.pid = Some(child.id());
-        self.child = Some(child);
-        Ok(self)
+        Ok(AzuriteQueue {
+            queue_host: self.queue_host.take(),
+            queue_port: self.queue_port,
+            cert: self.cert.take(),
+            debug: self.debug.take(),
+            disable_product_style_url: self.disable_product_style_url,
+            disable_telemetry: self.disable_telemetry,
+            extent_memory_limit: self.extent_memory_limit,
+            in_memory_persistence: self.in_memory_persistence,
+            key: self.key.take(),
+            location: self.location.take(),
+            loose: self.loose,
+            oauth: self.oauth.take(),
+            pwd: self.pwd.take(),
+            silent: self.silent,
+            skip_api_version_check: self.skip_api_version_check,
+            pid: Some(child.id()),
+            child: Some(child),
+            _state: PhantomData,
+        })
     }
 }
 
-impl Default for AzuriteQueue {
+impl AzuriteQueue<()> {
+    /// Returns the PID of the spawned process.
+    pub fn pid(&self) -> u32 {
+        self.pid.expect("pid is set after start")
+    }
+}
+
+impl Default for AzuriteQueue<Builder> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for AzuriteQueue {
+impl<State> Drop for AzuriteQueue<State> {
     fn drop(&mut self) {
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();

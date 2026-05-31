@@ -46,7 +46,7 @@ fn main() {
         .start()
         .expect("failed to spawn azurite");
 
-    let pid = azurite.pid().expect("pid must be set after start");
+    let pid = azurite.pid();
     info!(pid, "azurite process spawned");
 
     for (name, port) in [("blob", 11000u16), ("queue", 11001), ("table", 11002)] {

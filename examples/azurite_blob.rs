@@ -34,7 +34,7 @@ fn main() {
         .start()
         .expect("failed to spawn azurite-blob");
 
-    let pid = azurite.pid().expect("pid must be set after start");
+    let pid = azurite.pid();
     info!(pid, "azurite-blob process spawned");
 
     info!(port = 10000, "waiting for blob port");
@@ -69,7 +69,7 @@ fn main() {
         .start()
         .expect("failed to spawn azurite-blob (in-memory)");
 
-    let pid2 = azurite2.pid().expect("pid must be set after start");
+    let pid2 = azurite2.pid();
     info!(pid = pid2, "azurite-blob (in-memory) spawned");
 
     assert!(

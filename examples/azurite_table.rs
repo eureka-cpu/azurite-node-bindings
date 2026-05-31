@@ -35,7 +35,7 @@ fn main() {
         .start()
         .expect("failed to spawn azurite-table");
 
-    let pid = azurite.pid().expect("pid must be set after start");
+    let pid = azurite.pid();
     info!(pid, "azurite-table process spawned");
 
     info!(port = 10002, "waiting for table port");
@@ -68,7 +68,7 @@ fn main() {
         .start()
         .expect("failed to spawn azurite-table (in-memory)");
 
-    let pid2 = azurite2.pid().expect("pid must be set after start");
+    let pid2 = azurite2.pid();
     info!(pid = pid2, "azurite-table (in-memory) spawned");
 
     assert!(
