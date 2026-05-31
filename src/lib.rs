@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use std::process::{Child, Command};
 
 /// Marker type for the builder state — builder methods are available, the process has not started.
+#[doc(hidden)]
 pub struct Builder;
 
 /// Runs all three Azurite services (blob, table, queue) in a single process.
