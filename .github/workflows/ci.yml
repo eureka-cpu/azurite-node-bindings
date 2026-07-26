@@ -11,3 +11,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v16
       - run: nix flake check
+      - run: nix flake check ./nixos/examples/azurite-blob --override-input azurite-node-bindings .
