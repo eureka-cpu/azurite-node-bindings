@@ -16,7 +16,13 @@
   outputs = { self, nixpkgs, ... }@inputs:
     let
       inherit (nixpkgs) lib;
-      eachSystem = f: lib.genAttrs lib.systems.flakeExposed (system: f nixpkgs.legacyPackages.${system});
+
+      overlays.default = import ./nixos/overlays;
+      eachSystem = f: lib.genAttrs lib.systems.flakeExposed (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system}.extend overlays.default;
+        in
+        f pkgs);
 
       src = lib.cleanSourceWith {
         filter = path: _type: !lib.hasSuffix ".nix" path;
@@ -35,6 +41,17 @@
       };
     in
     {
+      inherit overlays;
+
+      legacyPackages = eachSystem lib.id;
+
+      apps = eachSystem (pkgs: {
+        update-azurite = {
+          type = "app";
+          program = "${pkgs.azurite.passthru.updateScript}";
+        };
+      });
+
       checks = eachSystem (pkgs: {
         azure-node-bindings = pkgs.rustPlatform.buildRustPackage {
           inherit src;
