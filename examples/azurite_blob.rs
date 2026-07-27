@@ -3,7 +3,7 @@ mod common;
 
 use azurite_node_bindings::AzuriteBlob;
 use std::time::Duration;
-use tracing::info;
+use tracing::{info, warn};
 
 fn main() {
     tracing_subscriber::fmt()
@@ -27,10 +27,12 @@ fn main() {
         .location(tmp.to_str().unwrap())
         // behaviour flags
         .loose()
-        .silent()
         .skip_api_version_check()
         .disable_telemetry()
         .disable_product_style_url()
+        // route azurite output through tracing
+        .stdout(|line| info!(target: "AzuriteBlobStdout", "{line}"))
+        .stderr(|line| warn!(target: "AzuriteBlobStderr", "{line}"))
         .start()
         .expect("failed to spawn azurite-blob");
 
@@ -62,10 +64,11 @@ fn main() {
         .in_memory_persistence()
         .extent_memory_limit(64)
         .loose()
-        .silent()
         .skip_api_version_check()
         .disable_telemetry()
         .disable_product_style_url()
+        .stdout(|line| tracing::info!(target: "azurite", "{line}"))
+        .stderr(|line| tracing::warn!(target: "azurite", "{line}"))
         .start()
         .expect("failed to spawn azurite-blob (in-memory)");
 

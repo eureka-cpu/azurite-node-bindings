@@ -3,7 +3,7 @@ mod common;
 
 use azurite_node_bindings::AzuriteTable;
 use std::time::Duration;
-use tracing::info;
+use tracing::{info, warn};
 
 fn main() {
     tracing_subscriber::fmt()
@@ -28,10 +28,12 @@ fn main() {
         .location(tmp.to_str().unwrap())
         // behaviour flags
         .loose()
-        .silent()
         .skip_api_version_check()
         .disable_telemetry()
         .disable_product_style_url()
+        // route azurite output through tracing
+        .stdout(|line| info!(target: "AzuriteTableStdout", "{line}"))
+        .stderr(|line| warn!(target: "AzuriteTableStderr", "{line}"))
         .start()
         .expect("failed to spawn azurite-table");
 
@@ -61,10 +63,11 @@ fn main() {
         .table_keep_alive_timeout(30)
         .in_memory_persistence()
         .loose()
-        .silent()
         .skip_api_version_check()
         .disable_telemetry()
         .disable_product_style_url()
+        .stdout(|line| tracing::info!(target: "azurite", "{line}"))
+        .stderr(|line| tracing::warn!(target: "azurite", "{line}"))
         .start()
         .expect("failed to spawn azurite-table (in-memory)");
 

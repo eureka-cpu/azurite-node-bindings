@@ -37,12 +37,14 @@ fn main() {
         .extent_memory_limit(128)
         // behaviour flags
         .loose()
-        .silent()
         .skip_api_version_check()
         .disable_telemetry()
         .disable_product_style_url()
         // debug log
         .debug(debug_log.to_str().unwrap())
+        // route azurite output through tracing
+        .stdout(|line| info!(target: "AzuriteStdout", "{line}"))
+        .stderr(|line| warn!(target: "AzuriteStderr", "{line}"))
         .start()
         .expect("failed to spawn azurite");
 

@@ -21,17 +21,19 @@ can be reached, and that their process is killed on `drop`.
 > You can run this, as well as resource specific examples located in the `examples` folder:
 >
 > ```sh
-> cargo run --example azurite_blob
+> cargo run --example azurite
 > ```
 
 ```rust,ignore
 use azurite_node_bindings::Azurite;
 use std::time::Duration;
 use tracing::{info, warn};
+
 mod common {
     use std::net::{SocketAddr, TcpStream};
     use std::path::Path;
     use std::time::{Duration, Instant};
+
     /// Poll `host:port` until a TCP connection succeeds or `timeout` elapses.
     pub fn wait_for_port(host: &str, port: u16, timeout: Duration) -> bool {
         let addr: SocketAddr = format!("{host}:{port}").parse().unwrap();
@@ -44,6 +46,7 @@ mod common {
         }
         false
     }
+
     /// Assert that a process with the given PID is no longer alive.
     /// Checks `/proc/<pid>` on Linux.
     pub fn assert_process_dead(pid: u32) {
@@ -61,10 +64,13 @@ fn main() {
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
         .init();
+
     let tmp = std::env::temp_dir().join("azurite-example");
     std::fs::create_dir_all(&tmp).unwrap();
     let debug_log = tmp.join("debug.log");
+
     info!("starting Azurite (blob + queue + table)");
+
     // Exercise every builder option except TLS (cert/key/pwd) and oauth,
     // which require external infrastructure.
     let azurite = Azurite::new()
@@ -89,10 +95,15 @@ fn main() {
         .disable_product_style_url()
         // debug log
         .debug(debug_log.to_str().unwrap())
+        // route azurite output through tracing
+        .stdout(|line| info!(target: "azurite", "{line}"))
+        .stderr(|line| warn!(target: "azurite", "{line}"))
         .start()
         .expect("failed to spawn azurite");
+
     let pid = azurite.pid();
     info!(pid, "azurite process spawned");
+
     for (name, port) in [("blob", 11000u16), ("queue", 11001), ("table", 11002)] {
         info!(service = name, port, "waiting for port");
         assert!(
@@ -101,13 +112,16 @@ fn main() {
         );
         info!(service = name, port, "ready");
     }
+
     if !debug_log.exists() {
         warn!(path = ?debug_log, "debug log not yet created (may appear on first request)");
     }
+
     info!("all services ready — dropping handle (kills process)");
     drop(azurite);
     common::assert_process_dead(pid);
     info!(pid, "process confirmed dead");
+
     std::fs::remove_dir_all(&tmp).ok();
 }
 ```

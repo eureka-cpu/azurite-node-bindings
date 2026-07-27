@@ -84,12 +84,14 @@
 //!         .extent_memory_limit(128)
 //!         // behaviour flags
 //!         .loose()
-//!         .silent()
 //!         .skip_api_version_check()
 //!         .disable_telemetry()
 //!         .disable_product_style_url()
 //!         // debug log
 //!         .debug(debug_log.to_str().unwrap())
+//!         // route azurite output through tracing
+//!         .stdout(|line| info!(target: "AzuriteStdout", "{line}"))
+//!         .stderr(|line| warn!(target: "AzuriteStderr", "{line}"))
 //!         .start()
 //!         .expect("failed to spawn azurite");
 //!
@@ -118,13 +120,35 @@
 //! }
 //! ```
 
-use std::io;
-use std::marker::PhantomData;
-use std::process::{Child, Command};
+use std::{
+    io::{self, BufRead, BufReader},
+    marker::PhantomData,
+    process::{Child, Command, Stdio},
+    sync::Arc,
+};
 
 /// Marker type for the builder state — builder methods are available, the process has not started.
 #[doc(hidden)]
 pub struct Builder;
+
+pub struct Sink(SinkKind);
+
+enum SinkKind {
+    Stdio(Stdio),
+    Fn(Arc<dyn Fn(String) + Send + Sync + 'static>),
+}
+
+impl From<Stdio> for Sink {
+    fn from(s: Stdio) -> Self {
+        Sink(SinkKind::Stdio(s))
+    }
+}
+
+impl<F: Fn(String) + Send + Sync + 'static> From<F> for Sink {
+    fn from(f: F) -> Self {
+        Sink(SinkKind::Fn(Arc::new(f)))
+    }
+}
 
 /// Runs all three Azurite services (blob, table, queue) in a single process.
 ///
@@ -168,6 +192,8 @@ pub struct Azurite<State = Builder> {
     pwd: Option<String>,
     silent: bool,
     skip_api_version_check: bool,
+    stdout: Option<Sink>,
+    stderr: Option<Sink>,
     pid: Option<u32>,
     child: Option<Child>,
     _state: PhantomData<State>,
@@ -198,6 +224,8 @@ impl Azurite<Builder> {
             pwd: None,
             silent: false,
             skip_api_version_check: false,
+            stdout: None,
+            stderr: None,
             pid: None,
             child: None,
             _state: PhantomData,
@@ -292,6 +320,14 @@ impl Azurite<Builder> {
         self.skip_api_version_check = true;
         self
     }
+    pub fn stdout(mut self, sink: impl Into<Sink>) -> Self {
+        self.stdout = Some(sink.into());
+        self
+    }
+    pub fn stderr(mut self, sink: impl Into<Sink>) -> Self {
+        self.stderr = Some(sink.into());
+        self
+    }
 
     /// Spawn the `azurite` process with the configured options.
     pub fn start(mut self) -> io::Result<Azurite<()>> {
@@ -362,7 +398,44 @@ impl Azurite<Builder> {
         if self.skip_api_version_check {
             cmd.arg("--skipApiVersionCheck");
         }
-        let child = cmd.spawn()?;
+        match self.stdout.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stdout(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stdout(Stdio::piped());
+                // thread is spawned after cmd.spawn() below
+                self.stdout = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        match self.stderr.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stderr(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stderr(Stdio::piped());
+                self.stderr = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        let mut child = cmd.spawn()?;
+        if let Some(Sink(SinkKind::Fn(f))) = self.stdout.take() {
+            let pipe = child.stdout.take().expect("stdout piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
+        if let Some(Sink(SinkKind::Fn(f))) = self.stderr.take() {
+            let pipe = child.stderr.take().expect("stderr piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
         Ok(Azurite {
             blob_host: self.blob_host.take(),
             blob_keep_alive_timeout: self.blob_keep_alive_timeout,
@@ -386,6 +459,8 @@ impl Azurite<Builder> {
             pwd: self.pwd.take(),
             silent: self.silent,
             skip_api_version_check: self.skip_api_version_check,
+            stdout: None,
+            stderr: None,
             pid: Some(child.id()),
             child: Some(child),
             _state: PhantomData,
@@ -448,6 +523,8 @@ pub struct AzuriteBlob<State = Builder> {
     pwd: Option<String>,
     silent: bool,
     skip_api_version_check: bool,
+    stdout: Option<Sink>,
+    stderr: Option<Sink>,
     pid: Option<u32>,
     child: Option<Child>,
     _state: PhantomData<State>,
@@ -472,6 +549,8 @@ impl AzuriteBlob<Builder> {
             pwd: None,
             silent: false,
             skip_api_version_check: false,
+            stdout: None,
+            stderr: None,
             pid: None,
             child: None,
             _state: PhantomData,
@@ -542,6 +621,14 @@ impl AzuriteBlob<Builder> {
         self.skip_api_version_check = true;
         self
     }
+    pub fn stdout(mut self, sink: impl Into<Sink>) -> Self {
+        self.stdout = Some(sink.into());
+        self
+    }
+    pub fn stderr(mut self, sink: impl Into<Sink>) -> Self {
+        self.stderr = Some(sink.into());
+        self
+    }
 
     /// Spawn the `azurite-blob` process with the configured options.
     pub fn start(mut self) -> io::Result<AzuriteBlob<()>> {
@@ -594,7 +681,44 @@ impl AzuriteBlob<Builder> {
         if self.skip_api_version_check {
             cmd.arg("--skipApiVersionCheck");
         }
-        let child = cmd.spawn()?;
+        match self.stdout.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stdout(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stdout(Stdio::piped());
+                // thread is spawned after cmd.spawn() below
+                self.stdout = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        match self.stderr.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stderr(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stderr(Stdio::piped());
+                self.stderr = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        let mut child = cmd.spawn()?;
+        if let Some(Sink(SinkKind::Fn(f))) = self.stdout.take() {
+            let pipe = child.stdout.take().expect("stdout piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
+        if let Some(Sink(SinkKind::Fn(f))) = self.stderr.take() {
+            let pipe = child.stderr.take().expect("stderr piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
         Ok(AzuriteBlob {
             blob_host: self.blob_host.take(),
             blob_keep_alive_timeout: self.blob_keep_alive_timeout,
@@ -612,6 +736,8 @@ impl AzuriteBlob<Builder> {
             pwd: self.pwd.take(),
             silent: self.silent,
             skip_api_version_check: self.skip_api_version_check,
+            stdout: None,
+            stderr: None,
             pid: Some(child.id()),
             child: Some(child),
             _state: PhantomData,
@@ -673,6 +799,8 @@ pub struct AzuriteTable<State = Builder> {
     pwd: Option<String>,
     silent: bool,
     skip_api_version_check: bool,
+    stdout: Option<Sink>,
+    stderr: Option<Sink>,
     pid: Option<u32>,
     child: Option<Child>,
     _state: PhantomData<State>,
@@ -696,6 +824,8 @@ impl AzuriteTable<Builder> {
             pwd: None,
             silent: false,
             skip_api_version_check: false,
+            stdout: None,
+            stderr: None,
             pid: None,
             child: None,
             _state: PhantomData,
@@ -762,6 +892,14 @@ impl AzuriteTable<Builder> {
         self.skip_api_version_check = true;
         self
     }
+    pub fn stdout(mut self, sink: impl Into<Sink>) -> Self {
+        self.stdout = Some(sink.into());
+        self
+    }
+    pub fn stderr(mut self, sink: impl Into<Sink>) -> Self {
+        self.stderr = Some(sink.into());
+        self
+    }
 
     /// Spawn the `azurite-table` process with the configured options.
     pub fn start(mut self) -> io::Result<AzuriteTable<()>> {
@@ -811,7 +949,44 @@ impl AzuriteTable<Builder> {
         if self.skip_api_version_check {
             cmd.arg("--skipApiVersionCheck");
         }
-        let child = cmd.spawn()?;
+        match self.stdout.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stdout(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stdout(Stdio::piped());
+                // thread is spawned after cmd.spawn() below
+                self.stdout = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        match self.stderr.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stderr(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stderr(Stdio::piped());
+                self.stderr = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        let mut child = cmd.spawn()?;
+        if let Some(Sink(SinkKind::Fn(f))) = self.stdout.take() {
+            let pipe = child.stdout.take().expect("stdout piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
+        if let Some(Sink(SinkKind::Fn(f))) = self.stderr.take() {
+            let pipe = child.stderr.take().expect("stderr piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
         Ok(AzuriteTable {
             table_host: self.table_host.take(),
             table_keep_alive_timeout: self.table_keep_alive_timeout,
@@ -828,6 +1003,8 @@ impl AzuriteTable<Builder> {
             pwd: self.pwd.take(),
             silent: self.silent,
             skip_api_version_check: self.skip_api_version_check,
+            stdout: None,
+            stderr: None,
             pid: Some(child.id()),
             child: Some(child),
             _state: PhantomData,
@@ -889,6 +1066,8 @@ pub struct AzuriteQueue<State = Builder> {
     pwd: Option<String>,
     silent: bool,
     skip_api_version_check: bool,
+    stdout: Option<Sink>,
+    stderr: Option<Sink>,
     pid: Option<u32>,
     child: Option<Child>,
     _state: PhantomData<State>,
@@ -912,6 +1091,8 @@ impl AzuriteQueue<Builder> {
             pwd: None,
             silent: false,
             skip_api_version_check: false,
+            stdout: None,
+            stderr: None,
             pid: None,
             child: None,
             _state: PhantomData,
@@ -978,6 +1159,14 @@ impl AzuriteQueue<Builder> {
         self.skip_api_version_check = true;
         self
     }
+    pub fn stdout(mut self, sink: impl Into<Sink>) -> Self {
+        self.stdout = Some(sink.into());
+        self
+    }
+    pub fn stderr(mut self, sink: impl Into<Sink>) -> Self {
+        self.stderr = Some(sink.into());
+        self
+    }
 
     /// Spawn the `azurite-queue` process with the configured options.
     pub fn start(mut self) -> io::Result<AzuriteQueue<()>> {
@@ -1027,7 +1216,44 @@ impl AzuriteQueue<Builder> {
         if self.skip_api_version_check {
             cmd.arg("--skipApiVersionCheck");
         }
-        let child = cmd.spawn()?;
+        match self.stdout.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stdout(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stdout(Stdio::piped());
+                // thread is spawned after cmd.spawn() below
+                self.stdout = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        match self.stderr.take() {
+            None => {}
+            Some(Sink(SinkKind::Stdio(s))) => {
+                cmd.stderr(s);
+            }
+            Some(Sink(SinkKind::Fn(f))) => {
+                cmd.stderr(Stdio::piped());
+                self.stderr = Some(Sink(SinkKind::Fn(f)));
+            }
+        }
+        let mut child = cmd.spawn()?;
+        if let Some(Sink(SinkKind::Fn(f))) = self.stdout.take() {
+            let pipe = child.stdout.take().expect("stdout piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
+        if let Some(Sink(SinkKind::Fn(f))) = self.stderr.take() {
+            let pipe = child.stderr.take().expect("stderr piped");
+            std::thread::spawn(move || {
+                for line in BufReader::new(pipe).lines().flatten() {
+                    f(line);
+                }
+            });
+        }
         Ok(AzuriteQueue {
             queue_host: self.queue_host.take(),
             queue_port: self.queue_port,
@@ -1044,6 +1270,8 @@ impl AzuriteQueue<Builder> {
             pwd: self.pwd.take(),
             silent: self.silent,
             skip_api_version_check: self.skip_api_version_check,
+            stdout: None,
+            stderr: None,
             pid: Some(child.id()),
             child: Some(child),
             _state: PhantomData,
