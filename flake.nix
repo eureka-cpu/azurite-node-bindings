@@ -33,6 +33,7 @@
         projectRootFile = "flake.lock";
         programs = {
           nixpkgs-fmt.enable = true;
+          shfmt.enable = true;
           rustfmt.enable = true;
           taplo.enable = true;
           yamlfmt.enable = true;
@@ -50,7 +51,7 @@
           type = "app";
           program = "${pkgs.writeShellApplication {
             name = "update-azurite";
-            runtimeInputs = with pkgs; [ curl jq nodejs_20 prefetch-npm-deps moreutils nix git ];
+            runtimeInputs = with pkgs; [ curl jq nodejs_22 prefetch-npm-deps moreutils nix git ];
             text = builtins.readFile ./nixos/overlays/azurite/update.sh;
           }}/bin/update-azurite";
           meta.description = "Internal update script for the azurite package.";
