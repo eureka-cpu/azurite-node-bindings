@@ -48,7 +48,11 @@
       apps = eachSystem (pkgs: {
         update-azurite = {
           type = "app";
-          program = "${pkgs.azurite.passthru.updateScript}";
+          program = "${pkgs.writeShellApplication {
+            name = "update-azurite";
+            runtimeInputs = with pkgs; [ curl jq nodejs_20 prefetch-npm-deps moreutils nix git ];
+            text = builtins.readFile ./nixos/overlays/azurite/update.sh;
+          }}/bin/update-azurite";
           meta.description = "Internal update script for the azurite package.";
         };
         show-options = {
