@@ -49,6 +49,7 @@
         update-azurite = {
           type = "app";
           program = "${pkgs.azurite.passthru.updateScript}";
+          meta.description = "Internal update script for the azurite package.";
         };
         show-options = {
           type = "app";
@@ -92,7 +93,7 @@
               treefmt.evalModule pkgs formattingOptions;
           in
           treefmt.config.build.check ./.;
-      } // lib.optionalAttrs pkgs.stdenv.isLinux {
+
         nixos-azurite = import ./nixos/modules/azurite/test.nix { inherit pkgs self lib; };
         nixos-azurite-blob = import ./nixos/modules/azurite-blob/test.nix { inherit pkgs self lib; };
         nixos-azurite-queue = import ./nixos/modules/azurite-queue/test.nix { inherit pkgs self lib; };
