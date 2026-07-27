@@ -28,97 +28,91 @@ in
     queueHost = lib.mkOption {
       type = lib.types.str;
       default = "127.0.0.1";
-      description = "Listening address for the queue service.";
+      description = "Customize listening address for queue (defaults to \"127.0.0.1\").";
     };
 
     queuePort = lib.mkOption {
       type = lib.types.port;
       default = 10001;
-      description = "Listening port for the queue service.";
+      description = "Customize listening port for queue (defaults to 10001).";
     };
 
     cert = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
-      description = "Path to a TLS certificate file.";
+      description = "Path to certificate file.";
     };
 
     key = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
-      description = "Path to the TLS certificate key (.pem) file.";
+      description = "Path to certificate key .pem file.";
     };
 
     pwd = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Password for a .pfx certificate file.";
+      description = "Password for .pfx file.";
     };
 
     oauth = lib.mkOption {
       type = lib.types.nullOr (lib.types.enum [ "basic" ]);
       default = null;
-      description = "OAuth authentication level. Set to \"basic\" to enable.";
+      description = "OAuth level. Candidate values: \"basic\".";
     };
 
     debug = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
-      description = "Enable debug logging; value is the path to the log file.";
+      description = "Enable debug log by providing a valid local file path as log destination.";
     };
 
     location = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
-      description = ''
-        Workspace directory for persisted data. Defaults to the service state
-        directory (<literal>/var/lib/azurite-queue</literal>).
-      '';
+      description = "Use an existing folder as workspace path, default is current working directory.";
     };
 
     extentMemoryLimit = lib.mkOption {
       type = lib.types.nullOr lib.types.int;
       default = null;
-      description = ''
-        Maximum in-memory extent storage in megabytes. Only used with
-        <option>inMemoryPersistence</option>. Defaults to 50 % of total RAM.
-      '';
+      description = "The number of megabytes to limit in-memory extent storage to. Only used with the --inMemoryPersistence option. Defaults to 50% of total memory.";
     };
 
     loose = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Ignore unsupported headers and parameters (loose mode).";
+      description = "Enable loose mode which ignores unsupported headers and parameters.";
     };
 
     silent = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Suppress the access log on stdout.";
+      description = "Disable access log displayed in console.";
     };
 
     inMemoryPersistence = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Keep all data in memory; nothing is written to disk.";
+      description = "Disable persisting any data to disk. If the Azurite process is terminated, all data is lost.";
     };
 
     disableTelemetry = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Opt out of Azurite telemetry collection.";
+      description = "Disable telemetry data collection of this Azurite execution. By default, Azurite will collect telemetry data to help improve the product.";
     };
 
     disableProductStyleUrl = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Always derive the account name from the first URL path segment instead of the host.";
+      description = "Disable getting account name from the host of request URI, always get account name from the first path segment of request URI.";
     };
 
     skipApiVersionCheck = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Accept requests regardless of their API version header.";
+      description = "Skip the request API version check, request with all API versions will be allowed.";
     };
   };
 

@@ -128,10 +128,16 @@ fn main() {
 
 ### As a Nix library
 
-The nix flake at the root of this repository exposes `nixosModules` which are intended to be used with [NixOS tests](https://nixos.org/manual/nixos/stable/#sec-nixos-tests).
+The nix flake at the root of this repository exposes `nixosModules` which are intended to be used with [NixOS tests](https://nixos.org/manual/nixpkgs/unstable/#tester-runNixOSTest).
 
 > [!NOTE]
 > Each module's interface is derived from its command line counter-part, and can be found in the `nixos/modules` folder.
+>
+> If ever in doubt, all module options can be easily viewed from the `show-options` app:
+>
+> ```sh
+> nix run github:eureka-cpu/azurite-node-bindings#show-options -- --help
+> ```
 
 For applications which rely on the Azure Blob, Table or Queue resource backends, this can be particularly
 useful for testing purposes since you can get real isolation between a sandboxed Azurite node and other services
@@ -253,5 +259,7 @@ the `azure-storage-blob` python library and asserts that it can be retrieved.
 #### NixOS Test Resources
 
 - The official NixOS test driver documentation: https://nixos.org/manual/nixos/stable/#sec-nixos-tests
-- Guide by Applicative Systems: https://applicative.systems/nixos-test-driver-manual/
-- NixOS tests on macOS: https://nixcademy.com/posts/running-nixos-integration-tests-on-macos/
+- The official NixOS test developer guide: https://nix.dev/tutorials/nixos/integration-testing-using-virtual-machines
+- In-depth guide by Applicative Systems: https://applicative.systems/nixos-test-driver-manual/
+- Illustrative article by Brian McGee: https://bmcgee.ie/posts/2025/02/nixos-the-power-of-vm-tests/
+- NixOS tests on macOS article: https://nixcademy.com/posts/running-nixos-integration-tests-on-macos/

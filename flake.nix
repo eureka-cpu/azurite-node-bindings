@@ -50,6 +50,11 @@
           type = "app";
           program = "${pkgs.azurite.passthru.updateScript}";
         };
+        show-options = {
+          type = "app";
+          program = "${pkgs.callPackage ./nixos/modules/show-options { }}/bin/azurite-show-options";
+          meta.description = "Show the NixOS module interface options declared by azurite-node-bindings.";
+        };
       });
 
       checks = eachSystem (pkgs: {
