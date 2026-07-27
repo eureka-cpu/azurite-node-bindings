@@ -155,7 +155,7 @@ the `azure-storage-blob` python library and asserts that it can be retrieved.
 > You can run this example:
 >
 > ```sh
-> nix build ./nixos/examples/azurite-blob#blob-upload-via-proxy -L
+> nix build ./nixos/examples/azurite-blob#checks.<SYSTEM>.blob-upload-via-proxy -L
 > ```
 
 ```nix
