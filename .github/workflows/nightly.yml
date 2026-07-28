@@ -73,6 +73,7 @@ jobs:
         run: |
           cargo_version="$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')"
           status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "User-Agent: azurite-node-bindings CI" \
             "https://crates.io/api/v1/crates/azurite-node-bindings/$cargo_version")
           if [ "$status" = "200" ]; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
