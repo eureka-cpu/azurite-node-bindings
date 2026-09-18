@@ -1,9 +1,8 @@
-{ pkgs, self, lib }:
-pkgs.testers.runNixOSTest {
+{
   name = "nixos-azurite-queue";
 
   nodes.machine = { pkgs, ... }: {
-    imports = [ self.nixosModules.azurite-queue ];
+    imports = [ ./default.nix ];
 
     environment.systemPackages = [ pkgs.curl ];
 
