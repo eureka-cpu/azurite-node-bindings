@@ -175,7 +175,10 @@ the `azure-storage-blob` python library and asserts that it can be retrieved.
         "aarch64-linux"
         "aarch64-darwin" # Requires nix-darwin linux-builder
       ]
-        (system: f (nixpkgs.legacyPackages.${system}.extend azurite-node-bindings.overlays.default));
+        (system: f (import nixpkgs {
+          inherit system;
+          overlays = [ azurite-node-bindings.overlays.default ];
+        }));
     in
     {
       checks = eachSystem (pkgs: {
@@ -224,7 +227,7 @@ the `azure-storage-blob` python library and asserts that it can be retrieved.
               blobPort = toString nodes.provider.services.azurite-blob.blobPort;
               serverPort = toString nodes.server.services.nginx.defaultHTTPListenPort;
             in
-            ''
+              /* py */ ''
               from azure.storage.blob import BlobServiceClient
 
               provider.start()

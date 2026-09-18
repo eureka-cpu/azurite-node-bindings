@@ -18,11 +18,11 @@
       inherit (nixpkgs) lib;
 
       overlays.default = import ./nixos/overlays;
-      eachSystem = f: lib.genAttrs lib.systems.flakeExposed (system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system}.extend overlays.default;
-        in
-        f pkgs);
+      eachSystem = f: lib.genAttrs lib.systems.flakeExposed
+        (system: f (import nixpkgs {
+          inherit system;
+          overlays = [ overlays.default ];
+        }));
 
       src = lib.cleanSourceWith {
         filter = path: _type: !lib.hasSuffix ".nix" path;
@@ -99,10 +99,10 @@
           in
           treefmt.config.build.check ./.;
 
-        nixos-azurite = import ./nixos/modules/azurite/test.nix { inherit pkgs self lib; };
-        nixos-azurite-blob = import ./nixos/modules/azurite-blob/test.nix { inherit pkgs self lib; };
-        nixos-azurite-queue = import ./nixos/modules/azurite-queue/test.nix { inherit pkgs self lib; };
-        nixos-azurite-table = import ./nixos/modules/azurite-table/test.nix { inherit pkgs self lib; };
+        nixos-azurite = pkgs.testers.runNixOSTest (import ./nixos/modules/azurite/test.nix);
+        nixos-azurite-blob = pkgs.testers.runNixOSTest (import ./nixos/modules/azurite-blob/test.nix);
+        nixos-azurite-queue = pkgs.testers.runNixOSTest (import ./nixos/modules/azurite-queue/test.nix);
+        nixos-azurite-table = pkgs.testers.runNixOSTest (import ./nixos/modules/azurite-table/test.nix);
       });
 
       nixosModules = {
